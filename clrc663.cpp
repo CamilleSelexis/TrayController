@@ -37,7 +37,7 @@ int Clrc663::init(uint8_t address)
   PRINT("\n* version: ");
   PRINTHEX(ver,HEX);
   if(ver != 0){
-    Serial.print("Reader addr : 0x");Serial.println(addr,HEX);
+    PRINT("Reader addr : 0x");PRINTHEX(addr,HEX);
   //Serial.println(ver,HEX);
   }
   PRINT("\n--------------------------\n");
@@ -79,7 +79,6 @@ uint8_t Clrc663::read_reg(uint8_t reg)
   //long time_2 = millis();
   Wire.requestFrom((int)addr, (int)1);
   //long time_3 = millis();
-  //Serial.print("Time 2-1 = ");Serial.print(time_2-time_1);Serial.print(" // Time3-2 = ");Serial.println(time_3-time_2);
   return Wire.read();
 }
 
