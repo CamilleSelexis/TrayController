@@ -24,6 +24,10 @@ void init_pcf8575(int adr){
 bool enable_SSR(byte row){
   pcf8575.pinMode(row,OUTPUT);
   pcf8575.digitalWrite(row,LOW);
+  bSSRON = true;
+  if(start_SSR == 0){ //Only change the SSR time if it was at 0 to avoid overheating the EM
+    start_SSR = millis();
+  }
 }
 
 //rows is 0 or 4

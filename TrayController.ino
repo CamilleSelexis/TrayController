@@ -36,18 +36,6 @@ IPAddress ip(192,168,1,81);   //Adresse IP
 String StringIP = "192.168.1.81";
 EthernetServer server = EthernetServer(80);  // (port 80 is default for HTTP) 52 is the number of the lab
 
-//Timer Related ---------------------------
-volatile bool toggle0 = true;
-volatile bool toggle1 = true;
-
-#define TIMER0_INTERVAL_MS        60000 //Every minutes
-#define TIMER1_INTERVAL_MS        10000
-
-// Init timer TIM15
-Portenta_H7_Timer ITimer0(TIM15);
-// Init  timer TIM16
-Portenta_H7_Timer ITimer1(TIM16);
-
 
 //Pins Portenta
 // SDA  D11
@@ -67,10 +55,11 @@ Portenta_H7_Timer ITimer1(TIM16);
 #define PORT_MUX_MAX 10
 
 /* scan  infos */
-
+#define SCAN_TIMEOUT  60000
+#define SSR_TIMEOUT   10000
 
 unsigned long scan_millis; /* time between scans */
-unsigned long last_scan;   /* last time scanned */
+unsigned long last_scan = 0;   /* last time scanned */
 
 #define MUX_COUNT 2
 #define MUX1_ADDRESS 0x70
@@ -84,8 +73,11 @@ uint8_t muxChannelMax[] = {MUX1_CHANNEL_COUNT,MUX2_CHANNEL_COUNT};
 bool readers[40];
 bool tagPresent[40];
 uint8_t tagContents[40][256];
+uint8_t uidList[40][10];
 uint8_t tagContentsStable[40][256];
-char readBuff[144];
+uint8_t readTag[144];
+uint8_t writeTag[144];
+long count0 = 1;
 /* Leds */
 #define LED_ON 1
 #define LED_OFF 0
@@ -95,6 +87,8 @@ PCA95 pcaMux(MUX1_ADDRESS,MUX2_ADDRESS,MUX_CHANNEL_TOTAL,MUX1_CHANNEL_COUNT);
 
 
 PCF8575 pcf8575(PCF8575_ADDR);
+bool bSSRON = false;
+long start_SSR =0;
 //reset function -- Call it to reset the arduino
 void resetFunc(void) {
   unsigned long *registerAddr;
@@ -127,18 +121,11 @@ void setup() {
       tagContents[i][j] = 0;
       tagContentsStable[i][j] = 0;
     }
+    for(int j = 0;j<10;j++){
+      uidList[i][j] = 0;
+    }
   }
-  init_timers();
-  /*
-  for(int positionKuhner = 1; positionKuhner <= 40; positionKuhner++){
-    //Get the channel and position from the position in the Kuhner (1-40)
-    int calcChannel = ceil(float(positionKuhner)/8)*2 - (positionKuhner%2?1:0);//Gives the channel index based on the position 1-40
-    int calcAddr = (ceil(float((positionKuhner%8))/2) + (positionKuhner%8?0:4))-1;//Gives the offset from 0x28 that should be applied to the reader addr
-    
-  }
-  clrc.pcaselect(muxAddress[0],0);
-  */
-  //clrc.init(CLRC_DEFAULT_ADDRESS);
+  
   init_pcf8575(PCF8575_ADDR);
 
   //----------------------ETHERNET INITIALIZATION------------------------------------------------
@@ -160,48 +147,28 @@ void setup() {
   server.begin();           //"server" is the name of the object for comunication through ethernet
   Serial.print("Ethernet server connected. Server is at ");
   Serial.println(Ethernet.localIP());         //Gives the local IP through serial com
+  readAllPresent();
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  /*Serial.println("Enable SSR");
-  enable_SSR(0);
-  enable_SSR(1);
-  enable_SSR(2);
-  enable_SSR(3);
-  delay(5000);
-  Serial.println("Disable SSr");
-  
-  disable_SSR(0);
-  disable_SSR(1);
-    disable_SSR(2);
-  disable_SSR(3);
-  delay(5000);*/
-  long time_1 = millis();
-  long time_2 = millis();
-  long time_3 = millis();
-  /*int positionTag = random(1,40);
-  Serial.print("Random position is ");Serial.println(positionTag);
-  int calcChannel = ceil(float(positionTag)/8)*2 - (positionTag%2?1:0);//Gives the channel index based on the position 1-40
-  Serial.print("This position should address mux channel ");Serial.println(calcChannel);
-  int calcAddr = (ceil(float((positionTag%8))/2) + (positionTag%8?0:4))-1;//Gives the offset from 0x28 that should be applied to the reader addr
-  
-  Serial.print("And the offset of the address of the PCB should be ");Serial.println(calcAddr);
-  Serial.print("Thus the address ");Serial.println((0x28+calcAddr),HEX);
-  Serial.println("-----------------------------");*/
   ethernetClientCheck();
-  time_2 = millis();
+  
   ScanPresent(); 
-  time_3 = millis();
-  if(toggle_0){
+
+  if(millis()-last_scan > SCAN_TIMEOUT){
+    last_scan = millis();
     readAllPresent();
   }
-  /*
-  Serial.print("Ethernet check took ");
-  Serial.println(time_2-time_1);
-  Serial.print("RFID chip check took "); //Take 6 seconds
-  Serial.println(time_3-time_2);
-  */
+  //Disable all ssr after one was activated
+  if(millis()-start_SSR > SSR_TIMEOUT && bSSRON){
+    Serial.println("SSR turning off");
+    bSSRON = false;
+    start_SSR = 0;
+    for(int i=0;i<8;i++){
+      disable_SSR(i);
+    }
+  }
 }
 
 void ethernetClientCheck(){
@@ -223,56 +190,60 @@ void ethernetClientCheck(){
           c = client.read();
         }
         
-        if(currentLine.endsWith("home")){
+        if(currentLine.indexOf("home")>0){
           homePage(client_pntr);
         }
-        if(currentLine.endsWith("SSRON")){
-          answerHTTP(client_pntr,currentLine);
+        if(currentLine.indexOf("SSRON")>0){
+          //answerHTTP(client_pntr,currentLine);
+          SSRONCommand(client_pntr,currentLine);
         }
-        if(currentLine.endsWith("SSROFF")){
+        /*if(currentLine.endsWith("SSRON")){
           answerHTTP(client_pntr,currentLine);
+        }*/
+        if(currentLine.indexOf("SSROFF")>0){
+          SSROFFCommand(client_pntr,currentLine);
         }
-        if(currentLine.endsWith("ReadTag")){
-          answerHTTP(client_pntr,currentLine);
-        }
-        if(currentLine.endsWith("WriteTag")){
-          answerHTTP(client_pntr,currentLine);
-        }
-        if(currentLine.endsWith("ReadAllTags")){
+        if(currentLine.indexOf("showTagList")>0){
           readAllPresent();
-          answerHTTP(client_pntr,currentLine);
-        }
-        if(currentLine.endsWith("getTags")){
+          showTagList(client_pntr);
+        } 
+        if(currentLine.indexOf("getTagList")>0){
           readAllPresent();
-          answerHTTP(client_pntr,currentLine);
+          getTagList(client_pntr);
         }
-        
+        //ajax Request for auto update of home page
+        if(currentLine.indexOf("updateHome")>0){
+          updateHome(client_pntr);
+        }
+        //ajax Request for auto update of tag list
+        if(currentLine.indexOf("updateTagList")>0){
+          updateTagList(client_pntr);
+        }
+        if(currentLine.indexOf("readPosition")>0){
+          readPosition(client_pntr,currentLine);
+          //answerHTTP(client_pntr,currentLine);
+        }
+        if(currentLine.indexOf("writePosition")>0){
+          writePosition(client_pntr,currentLine);
+          //answerHTTP(client_pntr,currentLine);
+        }
       }//if(client.available())
       else if(millis()-time_start > 5000){
         Serial.println("Client timed out");
         client.stop();
       }
-      
     }//if(client.connected())
     client.stop();
-    
-  }//if(client)
-
-  
+  }//if(client) 
 }
-//tester mux avec 3.3V et PU à 3.3V
-//Tester avec 3.3V et PU 5V
-//Tester 5V et PU à 3.3V
+
 //This function scans all channel and all addresses and find where tags are present or not
 void ScanPresent()
 {
 
   PRINTLN("Full Scan in position order");
   PRINTLN("****************************************************");
-  PRINTLN("* mux\t| ch\t| add\t| ID");
-  long time_1 = millis();
   for(int positionKuhner = 1; positionKuhner <=40; positionKuhner++){
-    long time_2 = millis();
     //Get the channel and position from the position in the Kuhner (1-40)
     uint8_t calcChannel = ceil(float(positionKuhner)/8)*2 - (positionKuhner%2?1:0)-1;//Gives the channel index based on the position 1-40
     uint8_t calcAddr = (ceil(float((positionKuhner%8))/2) + (positionKuhner%8?0:4))-1;//Gives the offset from 0x28 that should be applied to the reader addresses
@@ -290,11 +261,11 @@ void ScanPresent()
         uint8_t data[16] = {0};
         uint8_t uid[10] = {0};
         uint8_t sak;
-        uint8_t len = clrc.iso14443a_select(uid, &sak);
+        uint8_t len = clrc.iso14443a_select(uidList[positionKuhner-1], &sak);
         if(len<1){
           PRINTLN("Error selecting PICC");
         }     
-        Serial.print("\nUID : "); clrc.print_buffer_hex((uint8_t*) uid, len);
+        //Serial.print("\nUID : "); clrc.print_buffer_hex((uint8_t*) uidList[positionKuhner-1], len);
         tagPresent[positionKuhner-1] = true;
       }
       else{
@@ -332,7 +303,6 @@ void readAllPresent(){
   PRINTLN("* mux\t| ch\t| add\t| ID");
   long time_1 = millis();
   for(int positionKuhner = 1; positionKuhner <=40; positionKuhner++){
-    long time_2 = millis();
     //Get the channel and position from the position in the Kuhner (1-40)
     uint8_t calcChannel = ceil(float(positionKuhner)/8)*2 - (positionKuhner%2?1:0)-1;//Gives the channel index based on the position 1-40
     uint8_t calcAddr = (ceil(float((positionKuhner%8))/2) + (positionKuhner%8?0:4))-1;//Gives the offset from 0x28 that should be applied to the reader addresses
@@ -351,7 +321,7 @@ void readAllPresent(){
         uint8_t data[16] = {0};
         uint8_t uid[10] = {0};
         uint8_t sak;
-        uint8_t len = clrc.iso14443a_select(uid, &sak);
+        uint8_t len = clrc.iso14443a_select(uidList[positionKuhner-1], &sak);
         if(len<1){
           PRINTLN("Error selecting PICC");
         }     
@@ -384,20 +354,6 @@ void readAllPresent(){
             if(!((i+1)%16)) PRINTLN("");
           }
         }
-        /*
-        //Write is done 4 bytes by 4 bytes
-        uint8_t writeBuf[144] = {0};
-        for(int i=0;i<144;i++){
-          writeBuf[i] = tagContents[positionKuhner-1][i] + 1;
-        }
-        for(uint8_t pageAdr = 0; pageAdr < 36; pageAdr++){
-          len = clrc.MF_write_block(pageAdr+4, writeBuf+pageAdr*4);
-          if(len != 16){
-            PRINTLN("Couldn't write block " + String(pageAdr));
-          }
-          delay(5);
-        }
-        */
       }
       else{
         PRINTLN("No tag found");
@@ -425,10 +381,133 @@ void readAllPresent(){
   } //for positionKuhner 1->40
   PRINTLN("\r\n----------------------------------------------------");   
   PRINTLN("Done.");
+  Serial.println("Read all tags took : " + String(millis()-time_1) + " ms");
 }
 void readBasket(uint8_t positionKuhner){
+  //This function read 1 tag at the position given in arg and put the result in tagContents and readTag
+  PRINT("Reading basket at position ");PRINTLN(positionKuhner)
+  PRINTLN("****************************************************");
+  uint8_t calcChannel = ceil(float(positionKuhner)/8)*2 - (positionKuhner%2?1:0)-1;//Gives the channel index based on the position 1-40
+  uint8_t calcAddr = (ceil(float((positionKuhner%8))/2) + (positionKuhner%8?0:4))-1;//Gives the offset from 0x28 that should be applied to the reader addresses
+
+  pcaMux.channelSelect(calcChannel);
   
+  if(clrc.init(CLRC663_BASE_ADDRESS + calcAddr)) {
+    //Init Transmitter
+    clrc.iso14443a_init();
+    clrc.transmit_enable(true);
+    
+    // send request of iso14443 version A device
+    if(clrc.iso14443a_REQA() == 2){
+      tagPresent[positionKuhner-1] = true;
+      uint8_t data[16] = {0};
+      uint8_t uid[10] = {0};
+      uint8_t sak;
+      uint8_t len = clrc.iso14443a_select(uidList[positionKuhner-1], &sak);
+      if(len<1){
+        PRINTLN("Error selecting PICC");
+      }     
+      
+      //Read 100% of user memory
+      //Read user memory and place the bytes in an array
+      //We have 144 byte of memory
+      uint8_t FFkey[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+      clrc.cmd_load_key(FFkey); // load into the key buffer
+      uint8_t readBuf[16];
+      len = 0;
+      //A block is 4 byte -> we need to read every 4 blocks not to create copy
+      for(uint8_t blockAddr = 0; blockAddr < 9; blockAddr++){
+        len += clrc.MF_read_block((blockAddr*4)+4, readBuf);
+        if(len == 0){
+          PRINT("Couldn't read block ");PRINTLN(blockAddr);
+        }
+        for(uint8_t byteAddr = 0; byteAddr < 16; byteAddr++){
+          tagContents[positionKuhner-1][blockAddr*16 + byteAddr] = readBuf[byteAddr]; //mux*32 + muxChannel*4+address
+          readTag[blockAddr*16 + byteAddr] = readBuf[byteAddr];
+        }
+        delay(5);
+      }
+      //If the read is correct then we write it in the Stable tagContents
+      if(len == 144){
+        PRINTLN("Managed to read the 144 bytes of User memory");
+        for(int i = 0;i<144;i++){
+          tagContentsStable[positionKuhner-1][i] = tagContents[positionKuhner-1][i]
+          PRINTLN(" 0x");PRINTHEX(tagContents[positionKuhner-1][i],HEX);
+          if(!((i+1)%16)) PRINTLN("");
+        }
+      }
+      else{
+        PRINTLN("ERROR READING THE CONTENTS OF THE TAG");
+      }
+    }
+    else{
+      PRINTLN("No tag found");
+      tagPresent[positionKuhner-1] = false;
+    }
+    
+    clrc.transmit_enable(false);
+  }//if(clrc.init) check that readers is responding
+  else{
+    PRINT("Reader didn't respond at position");PRINTLN(positionKuhner);
+  }
+    
+  pcaMux.closeAll();
+  PRINTLN("\r\n----------------------------------------------------");   
+  PRINTLN("Done.");
 }
 void writeBasket(uint8_t positionKuhner){
+  //This function write the content of 1 basket at the position given in arg with the data in writeBuff
+  PRINT("Reading basket at position ");PRINTLN(positionKuhner)
+  PRINTLN("****************************************************");
+  uint8_t calcChannel = ceil(float(positionKuhner)/8)*2 - (positionKuhner%2?1:0)-1;//Gives the channel index based on the position 1-40
+  uint8_t calcAddr = (ceil(float((positionKuhner%8))/2) + (positionKuhner%8?0:4))-1;//Gives the offset from 0x28 that should be applied to the reader addresses
+
+  pcaMux.channelSelect(calcChannel);
   
+  if(clrc.init(CLRC663_BASE_ADDRESS + calcAddr)) {
+    //Init Transmitter
+    clrc.iso14443a_init();
+    clrc.transmit_enable(true);
+    
+    // send request of iso14443 version A device
+    if(clrc.iso14443a_REQA() == 2){
+      tagPresent[positionKuhner-1] = true;
+      uint8_t data[16] = {0};
+      uint8_t uid[10] = {0};
+      uint8_t sak;
+      uint8_t len = clrc.iso14443a_select(uidList[positionKuhner-1], &sak);
+      if(len<1){
+        PRINTLN("Error selecting PICC");
+      }     
+      
+      //Read 100% of user memory
+      //Read user memory and place the bytes in an array
+      //We have 144 byte of memory
+      uint8_t FFkey[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+      clrc.cmd_load_key(FFkey); // load into the key buffer
+      uint8_t readBuf[16];
+      len = 0;
+      //Write is done 4 bytes by 4 bytes
+      for(uint8_t pageAdr = 0; pageAdr < 36; pageAdr++){
+        len = clrc.MF_write_block(pageAdr+4, writeTag+pageAdr*4);
+        if(len != 16){
+          PRINTLN("Couldn't write block " + String(pageAdr));
+        }
+        delay(5);
+      }
+    }
+    else{
+      PRINTLN("No tag found");
+      tagPresent[positionKuhner-1] = false;
+    }
+    
+    clrc.transmit_enable(false);
+  }//if(clrc.init) check that readers is responding
+  else{
+    PRINT("Reader didn't respond at position");PRINTLN(positionKuhner);
+  }
+    
+  pcaMux.closeAll();
+  PRINTLN("\r\n----------------------------------------------------");   
+  PRINTLN("Done.");  
 }
