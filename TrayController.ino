@@ -40,8 +40,6 @@ EthernetServer server = EthernetServer(80);  // (port 80 is default for HTTP) 52
 //Pins Portenta
 // SDA  D11
 // SCL  D12
-#define NANO 1
-#define PORTENTA 2
 #define SCAN_MUX_ENABLED 1
 
 /* i2c addresses */
@@ -82,10 +80,12 @@ long count0 = 1;
 #define LED_ON 1
 #define LED_OFF 0
 
+//RFID Reader/Writer
 Clrc663 clrc(CLRC_DEFAULT_ADDRESS);
+//I2C Multiplexer for RFID Tags
 PCA95 pcaMux(MUX1_ADDRESS,MUX2_ADDRESS,MUX_CHANNEL_TOTAL,MUX1_CHANNEL_COUNT);
 
-
+//SSR relay control
 PCF8575 pcf8575(PCF8575_ADDR);
 bool bSSRON = false;
 long start_SSR =0;
@@ -108,11 +108,16 @@ void setup() {
   //Init all RFID positions - check which positions are occupied or not
   long time_1 = millis();
   scan_readers(readers);
+  int sumReaders = 0;
   for(int i = 0;i<5;i++){
     for(int j = 0;j<8;j++){
       Serial.print(readers[j+i*8]);Serial.print("  ");
+      sumReaders += readers[j+i*8];
     }
     Serial.println("");
+  }
+  if(sumReaders<40){
+    Serial.println("Error reader missing");
   }
   Serial.print("all the init took ");Serial.println(millis()-time_1);
   //Init the tags array to be sure they are empty

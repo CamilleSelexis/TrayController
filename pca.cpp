@@ -27,8 +27,8 @@ PCA95::PCA95(uint8_t mux1, uint8_t mux2, uint8_t channelTotal, uint8_t channelCo
 }
 
 bool PCA95::channelSelect(uint8_t channel){
-  if(channel > _channelTotal-1) return false;
-  if(channel < _channelCount1-1){ //First MUX
+  if(channel > (_channelTotal-1)) return false;
+  if(channel < (_channelCount1)){ //First MUX
     Wire.beginTransmission(_mux1);
     Wire.write(1<< (channel));
     Wire.endTransmission();
@@ -47,7 +47,7 @@ bool PCA95::channelClose(uint8_t channel)
   PRINT("device address: ");
   PRINTHEX(_addr,HEX);
   if (channel > _channelTotal-1) return false;
-    if(channel < _channelCount1-1){ //First MUX
+    if(channel < _channelCount1){ //First MUX
     Wire.beginTransmission(_mux1);
     Wire.write(channel>>channel);
     Wire.endTransmission();

@@ -1,5 +1,5 @@
 void init_pcf8575(int adr){
-  PCF8575 pcf8575(adr); //Define the pcf8575 with its adr
+  //PCF8575 pcf8575(adr); //Define the pcf8575 with its adr
   pcf8575.begin();
   pcf8575.pinMode(P0,OUTPUT);
   pcf8575.pinMode(P1,OUTPUT);
@@ -10,13 +10,13 @@ void init_pcf8575(int adr){
   pcf8575.pinMode(P6,OUTPUT);
   pcf8575.pinMode(P7,OUTPUT);
   
-
-  pcf8575.digitalWrite(P0,LOW);
-  pcf8575.digitalWrite(P1,LOW);
-  pcf8575.digitalWrite(P2,LOW);
-  pcf8575.digitalWrite(P3,LOW);
-  pcf8575.digitalWrite(P4,LOW);
-  pcf8575.digitalWrite(P5,LOW);
+  //Disable all the SSR
+  pcf8575.digitalWrite(P0,HIGH);
+  pcf8575.digitalWrite(P1,HIGH);
+  pcf8575.digitalWrite(P2,HIGH);
+  pcf8575.digitalWrite(P3,HIGH);
+  pcf8575.digitalWrite(P4,HIGH);
+  pcf8575.digitalWrite(P5,HIGH);
   pcf8575.digitalWrite(P6,HIGH);
   pcf8575.digitalWrite(P7,HIGH);
 }
@@ -25,6 +25,7 @@ bool enable_SSR(byte row){
   pcf8575.pinMode(row,OUTPUT);
   pcf8575.digitalWrite(row,LOW);
   bSSRON = true;
+  Serial.println("Starting the SSR on row" + String(row));
   if(start_SSR == 0){ //Only change the SSR time if it was at 0 to avoid overheating the EM
     start_SSR = millis();
   }
