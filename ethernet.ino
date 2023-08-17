@@ -58,16 +58,19 @@ void homePage(EthernetClient* client_pntr){
   client_pntr->stop();
 }
 //This function is automatically called by the ajax script on the home page to update it every 2s
-void updateHome(EthernetClient* client_pntr){
+void updateStartPage(EthernetClient* client_pntr){
   String updateValues = "";
   for(int i = 0;i<40;i++){
     updateValues += String(tagPresent[i]+readers[i]); //gives 0 1 or 2 -> 0 : no reader // 1 : no tag //2 : tag present
-    updateValues += "\r|\r";
+    //updateValues += "\r|\r";
+    updateValues += "\r|";
   }
   client_pntr->print( Header );
   client_pntr->print(updateValues);
   //client_pntr->print( tagPresent[0] );   client_pntr->print( "|" );  client_pntr->print( tagPresent[1] );   client_pntr->print( "|" );  client_pntr->print( tagPresent[2] ); 
   Serial.println("data sent");
+  while (client_pntr->read() != -1);
+  client_pntr->stop();
 }
 void showTagList(EthernetClient* client_pntr){
   client_pntr->print(Header);
@@ -80,15 +83,15 @@ void updateTagList(EthernetClient* client_pntr){
   String updateValues = "";
   for(int i = 0;i<40;i++){
     for(int j=0;j<7;j++){
-      updateValues += "0x"; //gives 0 1 or 2 -> 0 : no reader // 1 : no tag //2 : tag present
-      updateValues += String(uidList[i][j],HEX); //gives 0 1 or 2 -> 0 : no reader // 1 : no tag //2 : tag present
-      updateValues += " "; //gives 0 1 or 2 -> 0 : no reader // 1 : no tag //2 : tag present
+      updateValues += "0x"; 
+      updateValues += String(uidList[i][j],HEX); //1 or 2 char depending on the value
+      updateValues += " "; 
     }
     updateValues += "\r|\r";
   }
   for(int i = 0;i<40;i++){
     for(int j=0;j<144;j++){
-      updateValues += char(tagContents[i][j]); //gives 0 1 or 2 -> 0 : no reader // 1 : no tag //2 : tag present
+      updateValues += char(tagContentsStable[i][j]); //
     }
     updateValues += "\r|\r";
   }
@@ -101,8 +104,11 @@ void updateTagList(EthernetClient* client_pntr){
 
 void SSRONCommand(EthernetClient* client_pntr,String currentLine) {
   int index = currentLine[6]-'0'; //Gives the index of the SSR to activate
+  Serial.println(index);
+
+  index = index-2*(index-4);
   Serial.print("SSRON at index : ");Serial.println(index);
-  enable_SSR(index-1); //The pcf takes index from 0 to 7
+  enable_SSR(index); //The pcf takes index from 0 to 7
   client_pntr->print( Header );
   client_pntr->println();
   client_pntr->print("Received command : " + currentLine + " at internal time :");client_pntr->println(millis());
@@ -115,8 +121,9 @@ void SSRONCommand(EthernetClient* client_pntr,String currentLine) {
 }
 void SSROFFCommand(EthernetClient* client_pntr,String currentLine) {
   int index = currentLine[7]-'0'; //Gives the index of the SSR to activate
+  index = index-2*(index-4);
   Serial.print("SSROFF at index : ");Serial.println(index);
-  disable_SSR(index-1); //The pcf takes index from 0 to 7
+  disable_SSR(index); //The pcf takes index from 0 to 7
   client_pntr->print( Header );
   client_pntr->println();
   client_pntr->print("Received command : " + currentLine + " at internal time :");client_pntr->println(millis());
@@ -129,7 +136,26 @@ void SSROFFCommand(EthernetClient* client_pntr,String currentLine) {
 }
 //This function is called to retrieve the arrays giving the full list of the tags
 void getTagList(EthernetClient* client_pntr){
-  client_pntr->print(Header);
+  String fullResponse = "";
+  fullResponse += HeaderOk;
+  for(int positionKuhner = 0;positionKuhner<40;positionKuhner++){
+
+      if(positionKuhner<9) fullResponse += "0";
+      fullResponse += String(positionKuhner+1) + ";";
+      for(int i=0;i<7;i++){
+        fullResponse += char(uidList[positionKuhner][i]);
+      }
+      fullResponse += ";";
+      for(int i=0;i<144;i++){
+        fullResponse += char(tagContentsStable[positionKuhner][i]);
+      }
+      fullResponse += "|\r\n";
+  }
+  Serial.println("String size is equal to " + String(fullResponse.length()));
+  Serial.println(fullResponse);
+  client_pntr->println(fullResponse);
+  /*
+  client_pntr->print(HeaderOk);
 
   for(int positionKuhner = 0;positionKuhner<40;positionKuhner++){
     if(positionKuhner<9){
@@ -139,13 +165,11 @@ void getTagList(EthernetClient* client_pntr){
     //Ewrite gives raw data
     Ewrite(uidList[positionKuhner],7); //UID are 7 byte long
     Eprint(";");
-    Ewrite(tagContents[positionKuhner],144);
+    Ewrite(tagContentsStable[positionKuhner],144);
     client_pntr->println("|");
   }
-  client_pntr->println("</body>");
-  client_pntr->println("</html>");
+  */
   delay(10);
-  //client_pntr->flush();
   while (client_pntr->read() != -1);
   client_pntr->stop();
 }
@@ -154,8 +178,24 @@ void readPosition(EthernetClient* client_pntr,String currentLine){
   int indexPosition = currentLine.length()-3; // Null char and 2 digits for the position
   uint8_t positionKuhner = 10* (currentLine[indexPosition]-'0') + currentLine[indexPosition+1]-'0';
   readBasket(positionKuhner);
-  client_pntr->print(Header);
+  String fullResponse = "";
+  fullResponse += HeaderOk;
+  if(positionKuhner<9) fullResponse += "0";
+  fullResponse += String(positionKuhner) + ";";
+  for(int i=0;i<7;i++){
+    fullResponse += char(uidList[positionKuhner][i]);
+  }
+  fullResponse += ";";
+  for(int i=0;i<144;i++){
+    fullResponse += char(tagContentsStable[positionKuhner][i]);
+  }
+  fullResponse += "|\r\n";
+  client_pntr->println(fullResponse);
+  /*
+  client_pntr->print(HeaderOk);
+  client_pntr->write(uidList[positionKuhner],7);
   client_pntr->write(readTag,144);
+  */
   while (client_pntr->read() != -1);
   client_pntr->stop();
 }
@@ -168,4 +208,44 @@ void writePosition(EthernetClient* client_pntr,String currentLine){
   client_pntr->write(writeTag,144);
   while (client_pntr->read() != -1);
   client_pntr->stop();
+}
+//This function returns the tag list only containing new informations based on tagUpdate
+void getTagUpdate(EthernetClient* client_pntr){
+  String fullResponse = "";
+  fullResponse += HeaderOk;
+  //client_pntr->print(HeaderOk);
+  for(int positionKuhner = 0;positionKuhner<40;positionKuhner++){
+    if(tagToTransmit[positionKuhner]){
+      /*
+      if(positionKuhner<9){
+        Eprint("0");
+      }
+      Eprint2(positionKuhner+1,";");
+      //Ewrite gives raw data
+      Ewrite(uidList[positionKuhner],7); //UID are 7 byte long
+      Eprint(";");
+      Ewrite(tagContentsStable[positionKuhner],144);
+      client_pntr->println("|");
+      */
+      //The size of the string will be equal to 17 + (144 + 7 + 7)*nbTag + 2 (println add \r\n)
+      //So the max size could be 6339 for 40 tags
+      if(positionKuhner<9) fullResponse += "0";
+      fullResponse += String(positionKuhner+1) + ";";
+      for(int i=0;i<7;i++){
+        fullResponse += char(uidList[positionKuhner][i]);
+      }
+      fullResponse += ";";
+      for(int i=0;i<144;i++){
+        fullResponse += char(tagContentsStable[positionKuhner][i]);
+      }
+      fullResponse += "|\r\n";
+      
+    }
+  }
+  client_pntr->println(fullResponse);
+  Serial.println("String size is equal to " + String(fullResponse.length()));
+  Serial.println(fullResponse);
+  while (client_pntr->read() != -1);
+  client_pntr->stop();
+  
 }

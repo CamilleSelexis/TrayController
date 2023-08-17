@@ -6,7 +6,7 @@ String yellow_dot = "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAYAAACprHcmAAAAAXNSR0IArs4
 String Header = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n";
 String HeaderRefresh = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nRefresh: 5\r\n\r\n";
 String HeaderRefresh2 = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nRefresh: 10\r\n\r\n";
-
+String HeaderOk = "HTTP/1.1 200 OK\r\n";
 String homePageStr = R"=====(
 <!DOCTYPE html>
 <html>
@@ -35,7 +35,7 @@ String homePageStr = R"=====(
  
     function updateTray()
     {
-      ajaxLoad('updateHome');
+      ajaxLoad('updateStartPage');
     }
     
     var ajaxRequest = null;
@@ -104,7 +104,7 @@ String homePageStr = R"=====(
       ajaxRequest.send();
     }
  
-    var myVar1 = setInterval(updateTray, 2000);  
+    var myVar1 = setInterval(updateTray, 4000);  
     var myVar2 = setInterval(updateTime, 1000);  
  
   </script>
@@ -337,7 +337,7 @@ String showTagListStr = R"=====(
       ajaxRequest.send();
     }
  
-    var myVar1 = setInterval(updateTagList, 5000);  
+    var myVar1 = setInterval(updateTagList, 10000);  
     var myVar2 = setInterval(updateTime, 1000);  
  
   </script>

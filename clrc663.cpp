@@ -27,20 +27,20 @@ int Clrc663::init(uint8_t address)
 {
   
   addr = address;
-  PRINTLN("\n**************************");
-  PRINTLN("* Selexis reader          ");
-  PRINT("* address: ");
-  PRINTHEX(addr,HEX);
+  //PRINTLN("\n**************************");
+  //PRINTLN("* Selexis reader          ");
+  //PRINT("* address: ");
+  //PRINTHEX(addr,HEX);
   //Try to communicate with the CLRC663 on the I2C bus, if we receive nothing then no need to try to communicate with the reader
   int ver = read_reg(CLRC663_REG_VERSION);
 
-  PRINT("\n* version: ");
-  PRINTHEX(ver,HEX);
+  //PRINT("\n* version: ");
+  //PRINTHEX(ver,HEX);
   if(ver != 0){
-    PRINT("Reader addr : 0x");PRINTHEX(addr,HEX);
+    //PRINT("Reader addr : 0x");PRINTHEX(addr,HEX);
   //Serial.println(ver,HEX);
   }
-  PRINT("\n--------------------------\n");
+  //PRINT("\n--------------------------\n");
 	return ver;
 }
 
@@ -55,14 +55,14 @@ void Clrc663::pcaselect(uint8_t paddr, uint8_t channel)
 }
 void Clrc663::pcaclose(uint8_t paddr, uint8_t channel)
 {
-  PRINTLN("PCA select ");
-  PRINT("device address: ");
-  PRINTHEX(paddr,HEX);
+  //PRINTLN("PCA select ");
+  //PRINT("device address: ");
+  //PRINTHEX(paddr,HEX);
   if (channel > 7) return;
   Wire.beginTransmission(paddr);
   Wire.write(channel >> channel);
   Wire.endTransmission(); 
-  PRINTLN("port close "); 
+  //PRINTLN("port close "); 
 }
 
 
