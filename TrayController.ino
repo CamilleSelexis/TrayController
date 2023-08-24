@@ -297,7 +297,6 @@ void ScanPresent()
         if(len<5){
           PRINTLN("Error selecting PICC");
         }     
-        
         //Serial.print("\nUID : "); clrc.print_buffer_hex((uint8_t*) uidList[positionKuhner-1], len);
         tagPresent[posKuhner] = true;
         if(tagPresentOld[posKuhner])//Si un tag était déjà présent
@@ -436,34 +435,6 @@ void readAllPresent(){
         //Serial.print("\nUID : "); clrc.print_buffer_hex((uint8_t*) uid, len);
 
         readCurrentTag(posKuhner);
-        /*
-        //Read 100% of user memory
-        //Read user memory and place the bytes in an array
-        //We have 144 byte of memory
-        uint8_t FFkey[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-        clrc.cmd_load_key(FFkey); // load into the key buffer
-        uint8_t readBuf[16];
-
-        len = 0;
-        //A block is 4 byte -> we need to read every 4 blocks not to create copy
-        for(uint8_t blockAddr = 0; blockAddr < 9; blockAddr++){
-          len += clrc.MF_read_block((blockAddr*4)+4, readBuf);
-          if(len == 0){
-            PRINT("Couldn't read block ");PRINTLN(blockAddr);
-          }
-          for(uint8_t byteAddr = 0; byteAddr < 16; byteAddr++){
-            tagContents[posKuhner][blockAddr*16 + byteAddr] = readBuf[byteAddr]; //mux*32 + muxChannel*4+address
-          }
-          delay(5);
-        }
-        //If the read is correct then we write it in the Stable tagContents
-        if(len == 144){
-          PRINTLN("Managed to read the 144 bytes of User memory");
-          for(int i = 0;i<144;i++){
-            tagContentsStable[posKuhner][i] = tagContents[posKuhner][i];
-          }
-        }
-        */
       }
       else{
         PRINTLN("No tag found");
@@ -633,7 +604,7 @@ bool readCurrentTag(uint8_t posKuhner){
           PRINTLN("Error reading memory");
           for(int i = 0;i<144;i++){
             //Serial.print(char(tagContents[posKuhner][i]));
-            tagContentsStable[posKuhner][i] = i+11; //10 is \n and is used as separator
+            tagContentsStable[posKuhner][i] = i+33; //10 is \n and is used as separator, start at 33 (!) so that the char are all visible
           }
           //Serial.println("");
           return false;
