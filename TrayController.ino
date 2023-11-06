@@ -1,9 +1,17 @@
+/*
+ * This programm is designed to run on an arduino portenta H7 Lite
+ * This programm should run on the M7 Core
+ * 
+ * 
+ * 
+ * 
+ */
 #include "Arduino.h"
 #include "clrc663.h"
 #include "clrc663-defs.h"
 #include "PCF8575.h"
 #include "pca.h"
-
+#include <Adafruit_MAX31865.h>
 #define _TIMERINTERRUPT_LOGLEVEL_     4
 
 #include "Portenta_H7_TimerInterrupt.h"
@@ -29,7 +37,16 @@
 const int LON = LOW;
 const int LOFF = HIGH;
 const int baud = 115200;
-
+// Temp control related
+// Use software SPI: CS, DI, DO, CLK
+#define PIN_HEATINGENABLE      5      //Input for heating enable
+#define PIN_SSRCONTROL         6       //Output for SSR COntrol
+#define PIN_ANALOGTEMP         4     //Output to give the temp as an analog measure
+Adafruit_MAX31865 thermo = Adafruit_MAX31865(7, 8, 10, 9);
+float tempDoor;
+float lastTemp;
+long lastMeasureTime = 0;
+long error_count = 0;
  //Ethernet related ---------------------
 byte mac[] = {0xDE, 0x03, 0x33, 0x13, 0x59, 0x99};  //Mac adress
 IPAddress ip(192,168,1,81);   //Adresse IP
@@ -69,7 +86,8 @@ unsigned long last_scan = 0;   /* last time scanned */
 uint8_t muxAddress[] = {MUX1_ADDRESS, MUX2_ADDRESS};
 uint8_t muxChannelMax[] = {MUX1_CHANNEL_COUNT,MUX2_CHANNEL_COUNT};
 bool readers[40];
-bool tagPresent[40];
+bool tagPresent[40]; //Tags that are detected -> does not mean that we can read the memory
+bool tagReadable[40]; //Tags that can be read -> should be the same as tag present
 bool tagUpdate[40]; //Tags that were updated
 bool tagToTransmit[40]; //Tags data to transmit the next time client asks for new info
 uint8_t tagContents[40][256];
@@ -91,6 +109,8 @@ PCA95 pcaMux(MUX1_ADDRESS,MUX2_ADDRESS,MUX_CHANNEL_TOTAL,MUX1_CHANNEL_COUNT);
 PCF8575 pcf8575(PCF8575_ADDR);
 bool bSSRON = false;
 long start_SSR =0;
+//Led indications
+bool bLedAlive = false;
 //reset function -- Call it to reset the arduino
 void resetFunc(void) {
   unsigned long *registerAddr;
@@ -126,6 +146,8 @@ void setup() {
   Serial.print("all the init took ");Serial.println(millis()-time_1);
   //Init the tags array to be sure they are empty
   for(int i=0;i<40;i++){
+    tagPresent[i] = 0;
+    tagReadable[i] = 0;
     for(int j =0;j<144;j++){
       tagContents[i][j] = 0;
       tagContentsStable[i][j] = 0;
@@ -157,11 +179,19 @@ void setup() {
   server.begin();           //"server" is the name of the object for comunication through ethernet
   Serial.print("Ethernet server connected. Server is at ");
   Serial.println(Ethernet.localIP());         //Gives the local IP through serial com
+  
+  //Init temperature control
+  thermo.begin(MAX31865_4WIRE);
+  pinMode(PIN_SSRCONTROL,OUTPUT);
+  pinMode(PIN_ANALOGTEMP,OUTPUT);
+  pinMode(PIN_HEATINGENABLE,INPUT);
   readAllPresent();
 }
 
 void loop() {
   //Check if a client is making a request as often as possible //every 2s
+  bLedAlive = !bLedAlive;
+  digitalWrite(LEDB, bLedAlive);
   ethernetClientCheck();
   //long time_1 = millis();
   //Update tag list as often as possible
@@ -170,7 +200,9 @@ void loop() {
   //read all positions every minutes, to correct potential errors might be unnecessary
   if(millis()-last_scan > SCAN_TIMEOUT){
     last_scan = millis();
+    digitalWrite(LEDG,LOW);
     readAllPresent();
+    digitalWrite(LEDG,HIGH);
   }
   //Disable all ssr after one was activated
   if(millis()-start_SSR > SSR_TIMEOUT && bSSRON){
@@ -180,6 +212,9 @@ void loop() {
     for(int i=0;i<8;i++){
       disable_SSR(i);
     }
+  }
+  if(millis()-lastMeasureTime>1000 && digitalRead(PIN_HEATINGENABLE)){
+    SlidingDoorTempControl();
   }
 }
 
@@ -360,6 +395,11 @@ void ScanPresent()
       else{
         PRINTLN("No tag found");
         tagPresent[posKuhner] = false;
+        tagReadable[posKuhner] = false;
+        //Clear UID because if the tag was read while it was being removed it could still read the UID but not the data
+        for(int i=0;i<10;i++){
+            uidList[posKuhner][i] = 0;
+        }
         if(tagPresentOld[posKuhner]){ //there was a tag, update lists
           tagUpdate[posKuhner] = true;
           tagToTransmit[posKuhner] = true;
@@ -574,39 +614,104 @@ void writeBasket(uint8_t positionKuhner){
 
 bool readCurrentTag(uint8_t posKuhner){
   //Read 100% of user memory
-        //Read user memory and place the bytes in an array
-        //We have 144 byte of memory
-        uint8_t FFkey[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-        clrc.cmd_load_key(FFkey); // load into the key buffer
-        uint8_t readBuf[16];
+  //Read user memory and place the bytes in an array
+  //We have 144 byte of memory
+  uint8_t FFkey[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  clrc.cmd_load_key(FFkey); // load into the key buffer
+  uint8_t readBuf[16];
 
-        uint8_t len = 0;
-        //A block is 4 byte -> we need to read every 4 blocks not to create copy
-        for(uint8_t blockAddr = 0; blockAddr < 9; blockAddr++){
-          len += clrc.MF_read_block((blockAddr*4)+4, readBuf);
-          if(len == 0){
-            PRINT("Couldn't read block ");PRINTLN(blockAddr);
-          }
-          for(uint8_t byteAddr = 0; byteAddr < 16; byteAddr++){
-            tagContents[posKuhner][blockAddr*16 + byteAddr] = readBuf[byteAddr]; //mux*32 + muxChannel*4+address
-          }
-          delay(5);
-        }
-        //If the read is correct then we write it in the Stable tagContents
-        if(len == 144){
-          PRINTLN("Managed to read the 144 bytes of User memory");
-          for(int i = 0;i<144;i++){
-            tagContentsStable[posKuhner][i] = tagContents[posKuhner][i];
-          }
-          return true;
-        }
-        else{
-          PRINTLN("Error reading memory");
-          for(int i = 0;i<144;i++){
-            //Serial.print(char(tagContents[posKuhner][i]));
-            tagContentsStable[posKuhner][i] = i+33; //10 is \n and is used as separator, start at 33 (!) so that the char are all visible
-          }
-          //Serial.println("");
-          return false;
-        }
+  uint8_t len = 0;
+  //A block is 4 byte -> we need to read every 4 blocks not to create copy
+  for(uint8_t blockAddr = 0; blockAddr < 9; blockAddr++){
+    len += clrc.MF_read_block((blockAddr*4)+4, readBuf);
+    if(len == 0){
+      PRINT("Couldn't read block ");PRINTLN(blockAddr);
+    }
+    for(uint8_t byteAddr = 0; byteAddr < 16; byteAddr++){
+      tagContents[posKuhner][blockAddr*16 + byteAddr] = readBuf[byteAddr]; //mux*32 + muxChannel*4+address
+    }
+    delay(5);
+  }
+  //If the read is correct then we write it in the Stable tagContents
+  if(len == 144){
+    PRINTLN("Managed to read the 144 bytes of User memory");
+    for(int i = 0;i<144;i++){
+      tagContentsStable[posKuhner][i] = tagContents[posKuhner][i];
+    }
+    tagReadable[posKuhner] = true;
+    return true;
+  }
+  else{
+    PRINTLN("Error reading memory");
+    for(int i = 0;i<144;i++){
+      //Serial.print(char(tagContents[posKuhner][i]));
+      tagContentsStable[posKuhner][i] = i+33; //10 is \n and is used as separator, start at 33 (!) so that the char are all visible
+    }
+    tagReadable[posKuhner] = false;
+    //Serial.println("");
+    return false;
+  }
+}
+
+//This function is called at most every 500 ms
+void SlidingDoorTempControl() {
+  float temp = 0;
+  float setpoint = 40;
+  float error = 0;
+  float Kp = 1.0;
+  float Kd = 3.0; //PID parameters to be tuned
+  float Ki = 0.01;
+  float ratio = 0;
+  uint16_t rtd = thermo.readRTD();
+
+  ratio = rtd;
+  temp = thermo.temperature(1000,4300);
+  //Serial.print("temperature = ");Serial.println(temp);
+  error = setpoint-temp;
+  long interval = millis()-lastMeasureTime;
+  lastMeasureTime = millis();
+
+    // Check and print any faults
+  uint8_t fault = thermo.readFault();
+  if (fault) {
+    Serial.print("Fault 0x"); Serial.println(fault, HEX);
+    if (fault & MAX31865_FAULT_HIGHTHRESH) {
+      Serial.println("RTD High Threshold"); 
+    }
+    if (fault & MAX31865_FAULT_LOWTHRESH) {
+      Serial.println("RTD Low Threshold"); 
+    }
+    if (fault & MAX31865_FAULT_REFINLOW) {
+      Serial.println("REFIN- > 0.85 x Bias"); 
+    }
+    if (fault & MAX31865_FAULT_REFINHIGH) {
+      Serial.println("REFIN- < 0.85 x Bias - FORCE- open"); 
+    }
+    if (fault & MAX31865_FAULT_RTDINLOW) {
+      Serial.println("RTDIN- < 0.85 x Bias - FORCE- open"); 
+    }
+    if (fault & MAX31865_FAULT_OVUV) {
+      Serial.println("Under/Over voltage"); 
+    }
+    error_count++;
+    thermo.clearFault();
+  }
+  float derror = (error-(setpoint-lastTemp))/interval*1000;
+  //PD Controller
+  float PDResult = Kp*error + Kd*derror;
+  //Serial.print("PDResult : ");Serial.println(PDResult);
+  if(PDResult > 0 && !fault && temp > 20 && temp < 50){
+    //Serial.println("Heating ON");
+    digitalWrite(PIN_SSRCONTROL,HIGH);
+  }
+  else{
+    //Serial.println("Heating OFF");
+    digitalWrite(PIN_SSRCONTROL,LOW);
+  }
+  analogWrite(PIN_ANALOGTEMP,int(ceil((temp-4)*255/42.5))); //Between 12.5 and 55 C -> 3.4V when not plugged by USB at 37.5 -> Check with portenta
+  if(error_count > 30){
+    resetFunc();
+  }
+  lastTemp = temp;
+
 }

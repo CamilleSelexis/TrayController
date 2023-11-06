@@ -98,6 +98,9 @@ String homePageStr = R"=====(
           document.getElementById('Tag38').style.backgroundColor = (tmpArray[37]>0)?((tmpArray[37]>1)?'lightgreen':'orange'):'red';
           document.getElementById('Tag39').style.backgroundColor = (tmpArray[38]>0)?((tmpArray[38]>1)?'lightgreen':'orange'):'red';
           document.getElementById('Tag40').style.backgroundColor = (tmpArray[39]>0)?((tmpArray[39]>1)?'lightgreen':'orange'):'red';
+
+          document.getElementById('Temp').innerHTML = tmpArray[40];
+          document.getElementById('Temp').style.backgroundColor = (tmpArray[40]>40)?'orange':'lightblue';
           }
         }
       }
@@ -116,6 +119,7 @@ String homePageStr = R"=====(
    <div id='main'>
      <h2>Kuhner RFID Controller</h2>
       <p id='P_time'>Time</p>
+      <p> Side door Temperature : <b id ='Temp'>Temp</b></p>
      <div id='content'> 
      <table style="height:420px; width: 640px;border-collapse: collapse; margin-left; auto; margin-right: auto;" border="1"><tbody>
         <tr style="height: 80px;">

@@ -61,10 +61,12 @@ void homePage(EthernetClient* client_pntr){
 void updateStartPage(EthernetClient* client_pntr){
   String updateValues = "";
   for(int i = 0;i<40;i++){
-    updateValues += String(tagPresent[i]+readers[i]); //gives 0 1 or 2 -> 0 : no reader // 1 : no tag //2 : tag present
-    //updateValues += "\r|\r";
+    //updateValues += String(tagPresent[i]+readers[i]); //gives 0 1 or 2 -> 0 : no reader // 1 : no tag //2 : tag present
+    updateValues += String(tagReadable[i]+readers[i]); //gives 0 1 or 2 -> 0 : no reader // 1 : no tag //2 : tag present
     updateValues += "\r|";
   }
+  updateValues += String(lastTemp);
+  updateValues += "\r|";
   client_pntr->print( Header );
   client_pntr->print(updateValues);
   //client_pntr->print( tagPresent[0] );   client_pntr->print( "|" );  client_pntr->print( tagPresent[1] );   client_pntr->print( "|" );  client_pntr->print( tagPresent[2] ); 
