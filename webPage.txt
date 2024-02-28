@@ -1,14 +1,3 @@
-
-String red_dot = "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAYAAACprHcmAAAAAXNSR0IArs4c6QAAAERJREFUKFNjZEADb2VU/oOEhJ/cYUSXgwvAFKErQNYEVoxLIUwjTANpigmZimw6I0mKaedmmJuIDjrksCUqUtAjAxsfAG6/KAyiiHWSAAAAAElFTkSuQmCC";
-String green_dot = "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAYAAACprHcmAAAAAXNSR0IArs4c6QAAAERJREFUKFNjZEADcs/C/oOEHkmtYkSXgwvAFKErQNYEVoxLIUwjTANpigmZimw6I0mKaedmmJuIDjrksCUqUtAjAxsfAJ6PKAznF8FZAAAAAElFTkSuQmCC";
-String yellow_dot = "iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAYAAACprHcmAAAAAXNSR0IArs4c6QAAAERJREFUKFNjZEAD/0/y/QcJMZp/YkSXgwvAFGEoQNIEVoxLIUwjzBbSFBMyFdl0RpIU087NMDcRHXTIYUtUpKBHBjY+ACJeKAzktf86AAAAAElFTkSuQmCC";
-
-String Header = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n";
-String HeaderBad = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n";
-String HeaderRefresh = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nRefresh: 5\r\n\r\n";
-String HeaderRefresh2 = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nRefresh: 10\r\n\r\n";
-String HeaderOk = "HTTP/1.1 200 OK\r\n";
-String homePageStr = R"=====(
 <!DOCTYPE html>
 <html>
  <head>
@@ -102,38 +91,12 @@ String homePageStr = R"=====(
 
           document.getElementById('Temp').innerHTML = tmpArray[40];
           document.getElementById('Temp').style.backgroundColor = (tmpArray[40]>40)?'orange':'lightblue';
-          
-          var TimeAliveDay = Math.floor(tmpArray[41]/86400);
-          tmpArray[41] = tmpArray[41]-86400*TimeAliveDay;
-          var TimeAliveHour = Math.floor(tmpArray[41]/3600);
-          tmpArray[41] = tmpArray[41]-3600*TimeAliveHour;
-          var TimeAliveMin = Math.floor(tmpArray[41]/60);
-          tmpArray[41] = tmpArray[41]-60*TimeAliveMin;
-          var TimeAliveSec = Math.floor(tmpArray[41]);
-
-          document.getElementById('Time_Alive_d').innerHTML = TimeAliveDay;
-          document.getElementById('Time_Alive_h').innerHTML = TimeAliveHour;
-          document.getElementById('Time_Alive_m').innerHTML = TimeAliveMin;
-          document.getElementById('Time_Alive_s').innerHTML = TimeAliveSec;
-          
           }
         }
       }
       ajaxRequest.send();
     }
  
-   function ajaxCommand(ajaxURL){
-      ajaxRequest.open('GET',ajaxURL,true);
-        ajaxRequest.onreadystatechange = function()
-        {
-          if(ajaxRequest.readyState == 4 && ajaxRequest.status==200)
-          {
-            var ajaxResult = ajaxRequest.responseText;
-          }
-        }
-        ajaxRequest.send();
-        alert(ajaxURL);
-    }
     var myVar1 = setInterval(updateTray, 4000);  
     var myVar2 = setInterval(updateTime, 1000);  
  
@@ -146,7 +109,6 @@ String homePageStr = R"=====(
    <div id='main'>
      <h2>Kuhner RFID Controller</h2>
       <p id='P_time'>Time</p>
-      <p> Time Alive : <b id ='Time_Alive_d'>Day</b> / <b id ='Time_Alive_h'>Hour</b> : <b id ='Time_Alive_m'>Min</b> : <b id ='Time_Alive_s'>Sec</b></p>
       <p> Side door Temperature : <b id ='Temp'>Temp</b></p>
      <div id='content'> 
      <table style="height:420px; width: 640px;border-collapse: collapse; margin-left; auto; margin-right: auto;" border="1"><tbody>
@@ -201,14 +163,14 @@ String homePageStr = R"=====(
           <td id = 'Tag8'> 8 </td>
         </tr>
         <tr style="height: 20px;">
-          <td><input type="button"onclick = "ajaxCommand('/SSRON1')" value = "EM OFF"></td>
-          <td><input type="button"onclick = "ajaxCommand('/SSRON2')" value = "EM OFF"></td>
-          <td><input type="button"onclick = "ajaxCommand('/SSRON3')" value = "EM OFF"></td>
-          <td><input type="button"onclick = "ajaxCommand('/SSRON4')" value = "EM OFF"></td>
-          <td><input type="button"onclick = "ajaxCommand('/SSRON5')" value = "EM OFF"></td>
-          <td><input type="button"onclick = "ajaxCommand('/SSRON6')" value = "EM OFF"></td>
-          <td><input type="button"onclick = "ajaxCommand('/SSRON7')" value = "EM OFF"></td>
-          <td><input type="button"onclick = "ajaxCommand('/SSRON8')" value = "EM OFF"></td>
+          <td><a href="http://192.168.1.81/SSRON1" target="_blank">MagOff</a></td>
+          <td><a href="http://192.168.1.81/SSRON2" target="_blank">MagOff</a></td>
+          <td><a href="http://192.168.1.81/SSRON3" target="_blank">MagOff</a></td>
+          <td><a href="http://192.168.1.81/SSRON4" target="_blank">MagOff</a></td>
+          <td><a href="http://192.168.1.81/SSRON5" target="_blank">MagOff</a></td>
+          <td><a href="http://192.168.1.81/SSRON6" target="_blank">MagOff</a></td>
+          <td><a href="http://192.168.1.81/SSRON7" target="_blank">MagOff</a></td>
+          <td><a href="http://192.168.1.81/SSRON8" target="_blank">MagOff</a></td>
         </tr>
     </table>
      </div>
@@ -222,7 +184,7 @@ String homePageStr = R"=====(
    </div> 
  </body>
 </html>
-)=====";
+  )=====";
 
 String showTagListStr = R"=====(
 <!DOCTYPE html>
@@ -594,10 +556,3 @@ String showTagListStr = R"=====(
    </div> 
  </body>
 </html>
-  )=====";
-/*
-  <p><span style="background-color: lightgreen;">Basket Present</span><br />
-  <span style="background-color: orange;">Reader Present</span><br />
-  <span style="background-color: red;">No Reader Detected</span><br /></p>
-  <p><a href="http://" + StringIP + "/showTagList">showTagList</a></p>
-          */

@@ -2,9 +2,7 @@
  * This programm is designed to run on an arduino portenta H7 Lite
  * This programm should run on the M7 Core
  * 
- * 
- * 
- * 
+
  */
 #include "Arduino.h"
 #include "clrc663.h"
@@ -38,10 +36,10 @@ const int LON = LOW;
 const int LOFF = HIGH;
 const int baud = 115200;
 // Temp control related
-// Use software SPI: CS, DI, DO, CLK
 #define PIN_HEATINGENABLE      5      //Input for heating enable
 #define PIN_SSRCONTROL         6       //Output for SSR COntrol
 #define PIN_ANALOGTEMP         4     //Output to give the temp as an analog measure
+// Use software SPI: CS, DI, DO, CLK
 Adafruit_MAX31865 thermo = Adafruit_MAX31865(7, 8, 10, 9);
 float tempDoor;
 float lastTemp;
@@ -243,42 +241,42 @@ void ethernetClientCheck(){
           homePage(client_pntr);
           Serial.println("Received command to reload home page");
         }
-        if(currentLine.indexOf("SSRON")>=0){
+        else if(currentLine.indexOf("SSRON")>=0){
           //answerHTTP(client_pntr,currentLine);
           SSRONCommand(client_pntr,currentLine);
         }
-        if(currentLine.indexOf("SSROFF")>=0){
+        else if(currentLine.indexOf("SSROFF")>=0){
           SSROFFCommand(client_pntr,currentLine);
         }
-        if(currentLine.indexOf("showTagList")>=0){
+        else if(currentLine.indexOf("showTagList")>=0){
           readAllPresent();
           showTagList(client_pntr);
           Serial.println("Received command to show tag list");
         } 
-        if(currentLine.indexOf("getTagList")>=0){
+        else if(currentLine.indexOf("getTagList")>=0){
           //readAllPresent();
           getTagList(client_pntr);
           readAllPresent();
         }
         //ajax Request for auto update of home page
-        if(currentLine.indexOf("updateStartPage")>=0){
+        else if(currentLine.indexOf("updateStartPage")>=0){
           updateStartPage(client_pntr);
           //Serial.println("Command to update the home page");
         }
         //ajax Request for auto update of tag list
-        if(currentLine.indexOf("updateTagList")>=0){
+        else if(currentLine.indexOf("updateTagList")>=0){
           updateTagList(client_pntr);
           //Serial.println("Command to update tag list");
         }
-        if(currentLine.indexOf("readPosition")>=0){
+        else if(currentLine.indexOf("readPosition")>=0){
           readPosition(client_pntr,currentLine);
           //answerHTTP(client_pntr,currentLine);
         }
-        if(currentLine.indexOf("writePosition")>=0){
+        else if(currentLine.indexOf("writePosition")>=0){
           writePosition(client_pntr,currentLine);
           //answerHTTP(client_pntr,currentLine);
         }
-        if(currentLine.indexOf("getTagUpdate")>=0){
+        else if(currentLine.indexOf("getTagUpdate")>=0){
           Serial.println("Received command getTagUpdate");
           getTagUpdate(client_pntr);
           Serial.println("Sent new tag data for positions : ");
@@ -289,10 +287,16 @@ void ethernetClientCheck(){
             tagToTransmit[i] = 0;
           }
         }
+        else if(currentLine.indexOf("resetController")>=0){
+          Serial.println("Received reset command");
+          answerHTTP(client_pntr,currentLine);
+          resetFunc();
+        }
         //}//if(!currentLine.indexOf("GET")>0)
       }//if(client.available())
       else if(millis()-time_start > 5000){
         Serial.println("Client timed out");
+        answerHTTPNo(client_pntr,currentLine,0);
         client.stop();
       }
     }//if(client.connected())

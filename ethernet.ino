@@ -35,12 +35,12 @@ void answerHTTP(EthernetClient* client_pntr,String currentLine){
 }
 
 //This function is called when the call won't be performed
-void answerHttpNo(EthernetClient* client_pntr,String currentLine, int state){
-  Eprint(Header);
+void answerHTTPNo(EthernetClient* client_pntr,String currentLine, int state){
+  Eprint(HeaderBad);
 
   client_pntr->print("Received command : " + currentLine + " at internal time :");client_pntr->println(millis());
   client_pntr->println();
-  client_pntr->print("The decapper cannot perform this action now, status=");client_pntr->println(state);
+  client_pntr->print("Unknown command received, status=");client_pntr->println(state);
   client_pntr->println("<p><a href=\"http://" + StringIP + "/home\">Home</a></p>");
   client_pntr->print("Connection closed by the server at internal time : ");client_pntr->println(millis());
   //Close the connection
@@ -66,6 +66,8 @@ void updateStartPage(EthernetClient* client_pntr){
     updateValues += "\r|";
   }
   updateValues += String(lastTemp);
+  updateValues += "\r|";
+  updateValues += String(millis()/1000);
   updateValues += "\r|";
   client_pntr->print( Header );
   client_pntr->print(updateValues);
@@ -218,17 +220,6 @@ void getTagUpdate(EthernetClient* client_pntr){
   //client_pntr->print(HeaderOk);
   for(int positionKuhner = 0;positionKuhner<40;positionKuhner++){
     if(tagToTransmit[positionKuhner]){
-      /*
-      if(positionKuhner<9){
-        Eprint("0");
-      }
-      Eprint2(positionKuhner+1,";");
-      //Ewrite gives raw data
-      Ewrite(uidList[positionKuhner],7); //UID are 7 byte long
-      Eprint(";");
-      Ewrite(tagContentsStable[positionKuhner],144);
-      client_pntr->println("|");
-      */
       //The size of the string will be equal to 17 + (144 + 7 + 7)*nbTag + 2 (println add \r\n)
       //So the max size could be 6339 for 40 tags
       if(positionKuhner<9) fullResponse += "0";
