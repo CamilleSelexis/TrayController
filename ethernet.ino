@@ -242,3 +242,60 @@ void getTagUpdate(EthernetClient* client_pntr){
   client_pntr->stop();
   
 }
+
+//This function sends the Kuhner raw process values to the client
+//RPM / 10 temperature,humidty,CO2/100
+//RPM|temperature|humidity|CO2
+void getKuhner_PV(EthernetClient* client_pntr){
+  String updateValues = "";
+  updateValues+= HeaderOk;
+  if(kuhner_shaking_current<10)updateValues += "0";
+  if(kuhner_shaking_current<100)updateValues += "0";
+  if(kuhner_shaking_current<1000)updateValues += "0";
+  updateValues += String(kuhner_shaking_current);
+  updateValues += "\r|";
+  if(kuhner_temp_current<10)updateValues += "0";
+  if(kuhner_temp_current<100)updateValues += "0";
+  if(kuhner_temp_current<1000)updateValues += "0";
+  updateValues += String(kuhner_temp_current);
+  updateValues += "\r|";
+  if(kuhner_humidity_current<10)updateValues += "0";
+  if(kuhner_humidity_current<100)updateValues += "0";
+  if(kuhner_humidity_current<1000)updateValues += "0";
+  updateValues += String(kuhner_humidity_current);
+  updateValues += "\r|";
+  if(kuhner_CO2_current<10)updateValues += "0";
+  if(kuhner_CO2_current<100)updateValues += "0";
+  if(kuhner_CO2_current<1000)updateValues += "0";
+  updateValues += String(kuhner_CO2_current);
+  updateValues += "\r|";
+  if(kuhner_shaking_setpoint<10)updateValues += "0";
+  if(kuhner_shaking_setpoint<100)updateValues += "0";
+  if(kuhner_shaking_setpoint<1000)updateValues += "0";
+  updateValues += String(kuhner_shaking_setpoint);
+  updateValues += "\r|";
+  if(kuhner_temp_setpoint<10)updateValues += "0";
+  if(kuhner_temp_setpoint<100)updateValues += "0";
+  if(kuhner_temp_setpoint<1000)updateValues += "0";
+  updateValues += String(kuhner_temp_setpoint);
+  updateValues += "\r|";
+  if(kuhner_humidity_setpoint<10)updateValues += "0";
+  if(kuhner_humidity_setpoint<100)updateValues += "0";
+  if(kuhner_humidity_setpoint<1000)updateValues += "0";
+  updateValues += String(kuhner_humidity_setpoint);
+  updateValues += "\r|";
+  if(kuhner_CO2_setpoint<10)updateValues += "0";
+  if(kuhner_CO2_setpoint<100)updateValues += "0";
+  if(kuhner_CO2_setpoint<1000)updateValues += "0";
+  updateValues += String(kuhner_CO2_setpoint);
+  updateValues += "\r|";
+  if(lastTemp<10)updateValues += "0";
+  updateValues += String(lastTemp);
+  updateValues += "\r|";
+  
+  client_pntr->print(updateValues);
+  while (client_pntr->read() != -1);
+  client_pntr->stop();
+  Serial.println(updateValues);
+  Serial.println("data sent");
+}

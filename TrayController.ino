@@ -47,10 +47,9 @@ long lastMeasureTime = 0;
 long error_count = 0;
  //Ethernet related ---------------------
 byte mac[] = {0xDE, 0x03, 0x33, 0x13, 0x59, 0x99};  //Mac adress
-IPAddress ip(192,168,1,81);   //Adresse IP
-String StringIP = "192.168.1.81";
+IPAddress ip(192,168,1,82);   //Adresse IP
+String StringIP = "192.168.1.82";
 EthernetServer server = EthernetServer(80);  // (port 80 is default for HTTP) 52 is the number of the lab
-
 
 //Pins Portenta
 // SDA  D11
@@ -117,6 +116,17 @@ void resetFunc(void) {
   //See Arm® v7-M Architecture Reference Manual for more information
   *registerAddr = (unsigned long) 0x05FA0304;
 }
+
+//EIP global variables
+int kuhner_temp_current = 0;
+int kuhner_humidity_current = 0;
+int kuhner_CO2_current = 0;
+int kuhner_shaking_current = 0;
+int kuhner_temp_setpoint = 0;
+int kuhner_humidity_setpoint = 0;
+int kuhner_CO2_setpoint = 0;
+int kuhner_shaking_setpoint = 0;
+unsigned long last_EIP_contact =0;
 
 void setup() {
   Serial.begin(baud);
@@ -214,6 +224,14 @@ void loop() {
   if(millis()-lastMeasureTime>1000 && digitalRead(PIN_HEATINGENABLE)){
     SlidingDoorTempControl();
   }
+  //Connect to the Net-Z and read all current values
+  //Put the results in global variable
+  
+  if(millis()-last_EIP_contact>15000){
+    get_attribute_single_allPV();
+    last_EIP_contact = millis();
+  }
+  
 }
 
 void ethernetClientCheck(){
@@ -286,6 +304,10 @@ void ethernetClientCheck(){
             }
             tagToTransmit[i] = 0;
           }
+        }
+        else if(currentLine.indexOf("getPV")>=0){
+          Serial.println("Received command getPV");
+          getKuhner_PV(client_pntr);
         }
         else if(currentLine.indexOf("resetController")>=0){
           Serial.println("Received reset command");
